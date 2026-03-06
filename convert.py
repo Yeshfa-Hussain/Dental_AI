@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 from pycocotools import mask as maskUtils
 
-base_dir = r"C:\Users\Haroon Traders\Documents\GitHub\Dental_AI\DentAI.v2i.coco-segmentation"
+base_dir = "DentAI.v2i.coco-segmentation"
 
 datasets = ["train","test","valid"]
 

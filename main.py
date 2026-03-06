@@ -3,11 +3,9 @@ import numpy as np
 from pycocotools.coco import COCO
 from PIL import Image
 
-# 🔹 Change this to your full project folder path
-# Example: "C:/Users/ALIZA/Dental_Project"
-base_dir = r"C:\Users\Haroon Traders\Documents\GitHub\Dental_AI\DentAI.v2i.coco-segmentation"
+base_dir = "DentAI.v2i.coco-segmentation"
 
-datasets = ["train", "val", "test"]
+datasets = ["train", "valid", "test"]
 
 print("Starting COCO → PNG mask conversion...")
 

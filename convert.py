@@ -1,48 +1,51 @@
+import json
 import os
 import numpy as np
-from pycocotools.coco import COCO
-from PIL import Image
+import cv2
+from pycocotools import mask as maskUtils
 
-# 🔹 Change this to your full project folder path
-# Example: "C:/Users/ALIZA/Dental_Project"
 base_dir = r"C:\Users\Haroon Traders\Documents\GitHub\Dental_AI\DentAI.v2i.coco-segmentation"
 
-datasets = ["train", "val", "test"]
-
-print("Starting COCO → PNG mask conversion...")
+datasets = ["train","test","valid"]
 
 for d in datasets:
-    ann_file = os.path.join(base_dir, d, "_annotations.coco.json")
-    output_dir = os.path.join(base_dir, d, "masks")
-    
-    print(f"\nProcessing dataset: {d}")
-    print(f"Looking for annotation file: {ann_file}")
-    
-    if not os.path.exists(ann_file):
-        print(f"❌ Annotation file not found for {d}, skipping...")
-        continue
 
-    os.makedirs(output_dir, exist_ok=True)
-    print(f"✅ Masks folder created: {output_dir}")
+    ann_path = os.path.join(base_dir,d,"_annotations.coco.json")
 
-    coco = COCO(ann_file)
-    
-    for img_id in coco.getImgIds():
-        img_info = coco.loadImgs(img_id)[0]
-        h, w = img_info["height"], img_info["width"]
-        mask = np.zeros((h, w), dtype=np.uint8)
+    with open(ann_path) as f:
+        coco = json.load(f)
 
-        ann_ids = coco.getAnnIds(imgIds=img_id)
-        anns = coco.loadAnns(ann_ids)
+    images = {img["id"]: img for img in coco["images"]}
 
-        for ann in anns:
-            mask[coco.annToMask(ann) > 0] = ann["category_id"]
+    for img_id,img in images.items():
 
-        mask_filename = os.path.splitext(img_info["file_name"])[0] + ".png"
-        mask_path = os.path.join(output_dir, mask_filename)
+        h = img["height"]
+        w = img["width"]
 
-        Image.fromarray(mask).save(mask_path)
+        mask = np.zeros((h,w),dtype=np.uint8)
 
-    print(f"✅ All masks created for {d}")
+        for ann in coco["annotations"]:
 
-print("\n🎉 Conversion complete! Check masks folders inside train/val/test")
+            if ann["image_id"] != img_id:
+                continue
+
+            seg = ann["segmentation"]
+
+            # polygon
+            if isinstance(seg,list):
+
+                for poly in seg:
+                    pts = np.array(poly).reshape(-1,2).astype(np.int32)
+                    cv2.fillPoly(mask,[pts],255)
+
+            # RLE
+            elif isinstance(seg,dict):
+
+                rle = seg
+                m = maskUtils.decode(rle)
+                mask = np.maximum(mask,m*255)
+
+        out_dir = os.path.join(base_dir,d,"masks")
+        os.makedirs(out_dir,exist_ok=True)
+
+        cv2.imwrite(os.path.join(out_dir,img["file_name"]),mask)

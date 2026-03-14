@@ -3,3 +3,4 @@ DentAI.v2i.coco-segmentation/
 venv
 masks/
 masks_colorized/
+__pycache__/

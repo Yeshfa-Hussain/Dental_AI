@@ -172,13 +172,13 @@ def main():
     train_dataset = DentalDataset(
         image_dir = os.path.join(DATA_DIR, "train"),
         mask_dir  = os.path.join(MASKS_DIR, "train"),
-        split      = "train",
+        # split      = "train",
         img_size   = IMG_SIZE
     )
     val_dataset = DentalDataset(
         image_dir = os.path.join(DATA_DIR, "valid"),
         mask_dir  = os.path.join(MASKS_DIR, "valid"),
-        split      = "valid",
+        # split      = "valid",
         img_size   = IMG_SIZE
     )
 

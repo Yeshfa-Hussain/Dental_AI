@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OralCIR-Net</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to right, #0D47A1, #1976D2);
+      color: white;
+    }
+
+    .main {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      padding: 40px;
+      gap: 50px;
+    }
+
+    /* LEFT SIDE (LOGO) */
+    .left {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+    }
+
+    .logo {
+      width: 350px;  /* 🔥 bada logo */
+    }
+
+    /* RIGHT SIDE (TEXT) */
+    .right {
+      flex: 1;
+      max-width: 500px;
+    }
+
+    h1 {
+      font-size: 42px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      font-size: 18px;
+      line-height: 1.6;
+      color: #E3F2FD;
+    }
+
+    .btn {
+      margin-top: 25px;
+      padding: 14px 28px;
+      font-size: 16px;
+      border: none;
+      border-radius: 25px;
+      background: white;
+      color: #0D47A1;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    .btn:hover {
+      background: #BBDEFB;
+      transform: scale(1.05);
+    }
+
+    /* MOBILE RESPONSIVE */
+    @media (max-width: 768px) {
+      .main {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      .logo {
+        width: 180px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="main">
+
+    <!-- LEFT -->
+    <div class="left">
+      <img src="logo.svg" class="logo" alt="Logo">
+    </div>
+
+    <!-- RIGHT -->
+    <div class="right">
+      <h1>OralCIR-Net</h1>
+      <p>
+        An AI-powered dental assistant designed to help you understand your oral health.
+        Describe symptoms in Urdu or English, upload your X-ray, and get instant guidance, from your dentist
+          <strong style="color:#000000;">Dr Aliza Bhatti.</strong>Because your dental health is our priority
+      </p>
+
+      <button class="btn" onclick="enterSite()">Let’s Get Started →</button>
+    </div>
+
+  </div>
+
+  <script>
+    function enterSite() {
+      window.location.href = "index.html";
+    }
+  </script>
+
+</body>
+</html>

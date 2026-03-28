@@ -1,46 +1,181 @@
-import os
+import torch
 import numpy as np
-from pycocotools.coco import COCO
 from PIL import Image
+import segmentation_models_pytorch as smp
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+import io
+import base64
+import os
+from dotenv import load_dotenv
+from fastapi import FastAPI, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from groq import Groq
 
-base_dir = "DentAI.v2i.coco-segmentation"
+# Load .env
+load_dotenv()
 
-datasets = ["train", "valid", "test"]
+app = FastAPI()
 
-print("Starting COCO → PNG mask conversion...")
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-for d in datasets:
-    ann_file = os.path.join(base_dir, d, "_annotations.coco.json")
-    output_dir = os.path.join(base_dir, d, "masks")
-    
-    print(f"\nProcessing dataset: {d}")
-    print(f"Looking for annotation file: {ann_file}")
-    
-    if not os.path.exists(ann_file):
-        print(f"❌ Annotation file not found for {d}, skipping...")
-        continue
+# ============================
+# GROQ CLIENT
+# ============================
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-    os.makedirs(output_dir, exist_ok=True)
-    print(f"✅ Masks folder created: {output_dir}")
+# ============================
+# SETTINGS
+# ============================
+DEVICE      = 'cuda' if torch.cuda.is_available() else 'cpu'
+NUM_CLASSES = 4
+MODEL_PATH  = 'Model File/best_model_ep8_val0.4036.pth'
 
-    coco = COCO(ann_file)
-    
-    for img_id in coco.getImgIds():
-        img_info = coco.loadImgs(img_id)[0]
-        h, w = img_info["height"], img_info["width"]
-        mask = np.zeros((h, w), dtype=np.uint8)
+COLORS = {
+    0: (0,   0,   0),
+    1: (255, 0,   0),
+    2: (0,   255, 0),
+    3: (0,   0,   255),
+}
 
-        ann_ids = coco.getAnnIds(imgIds=img_id)
-        anns = coco.loadAnns(ann_ids)
+CLASS_NAMES = {
+    0: "Background",
+    1: "Caries",
+    2: "Infection",
+    3: "Restoration",
+}
 
-        for ann in anns:
-            mask[coco.annToMask(ann) > 0] = ann["category_id"]
+# ============================
+# LOAD MODEL
+# ============================
+print(f"Loading model on {DEVICE}...")
+model = smp.Unet(
+    encoder_name="resnet34",
+    encoder_weights=None,
+    in_channels=3,
+    classes=NUM_CLASSES,
+    decoder_dropout=0.3
+).to(DEVICE)
+model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+model.eval()
+print("✅ Model loaded!")
 
-        mask_filename = os.path.splitext(img_info["file_name"])[0] + ".png"
-        mask_path = os.path.join(output_dir, mask_filename)
+# ============================
+# TRANSFORM
+# ============================
+transform = A.Compose([
+    A.Resize(256, 256),
+    A.Normalize(mean=(0.485, 0.456, 0.406),
+                std=(0.229, 0.224, 0.225)),
+    ToTensorV2()
+])
 
-        Image.fromarray(mask).save(mask_path)
+# ============================
+# PREDICT FUNCTION
+# ============================
+def predict_image(image_bytes):
+    img = np.array(Image.open(io.BytesIO(image_bytes)).convert("RGB"))
+    orig_h, orig_w = img.shape[:2]
 
-    print(f"✅ All masks created for {d}")
+    tensor = transform(image=img)['image'].unsqueeze(0).to(DEVICE)
 
-print("\n🎉 Conversion complete! Check masks folders inside train/val/test")
+    with torch.no_grad():
+        output = model(tensor)
+        pred_mask = torch.argmax(output, dim=1).squeeze().cpu().numpy()
+
+    pred_mask_resized = np.array(
+        Image.fromarray(pred_mask.astype(np.uint8)).resize(
+            (orig_w, orig_h), Image.NEAREST
+        )
+    )
+
+    color_mask = np.zeros((orig_h, orig_w, 3), dtype=np.uint8)
+    for cls, color in COLORS.items():
+        color_mask[pred_mask_resized == cls] = color
+
+    overlay = (img * 0.6 + color_mask * 0.4).astype(np.uint8)
+
+    detected = []
+    for cls_id, name in CLASS_NAMES.items():
+        if cls_id == 0:
+            continue
+        if (pred_mask_resized == cls_id).sum() > 100:
+            detected.append(name)
+
+    def to_base64(arr):
+        buf = io.BytesIO()
+        Image.fromarray(arr).save(buf, format='PNG')
+        return base64.b64encode(buf.getvalue()).decode()
+
+    return {
+        "detected": detected,
+        "color_mask": to_base64(color_mask),
+        "overlay":    to_base64(overlay),
+        "original":   to_base64(img),
+    }
+
+# ============================
+# GROQ CHAT FUNCTION
+# ============================
+def chat_with_groq(messages):
+    system_prompt = """You are a professional bilingual dental AI assistant. 
+You speak both Urdu and English fluently. 
+Detect the language the user is writing in and respond in the SAME language.
+
+Follow this conversation flow:
+1. When user says hello/salam → greet warmly and ask their name
+2. After name → ask their age  
+3. After age → ask their dental complaint
+4. After complaint → give specific dental advice based on these conditions:
+   - Bleeding gums → oral hygiene tips (brush twice, floss, mouthwash)
+   - Cold/hot sensitivity → possible caries/enamel erosion, suggest sensitivity toothpaste
+   - Pain after RCT/filling → explain healing vs complication signs, recommend crown after RCT
+   - Toothache → possible causes (caries, pulpitis, infection), temporary relief tips
+   - Swelling → URGENT warning, could be abscess, recommend immediate visit
+   - Bad breath → hygiene tips, tongue cleaner, water intake
+   - Broken tooth → avoid hard foods, keep piece, visit dentist
+
+Always end advice with recommendation to book an appointment.
+Keep responses friendly, professional and concise.
+Never diagnose definitively — always recommend seeing a dentist.
+Use patient's name in responses to make it personal."""
+
+    response = groq_client.chat.completions.create(
+       model="llama-3.3-70b-versatile",
+        messages=[{"role": "system", "content": system_prompt}] + messages,
+        max_tokens=500,
+        temperature=0.7,
+    )
+    return response.choices[0].message.content
+
+# ============================
+# ROUTES
+# ============================
+@app.get("/")
+def home():
+    return {"message": "✅ Dental AI API is running!"}
+
+@app.post("/predict")
+async def predict(file: UploadFile = File(...)):
+    try:
+        image_bytes = await file.read()
+        result = predict_image(image_bytes)
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.post("/chat")
+async def chat(request: dict):
+    try:
+        messages = request.get("messages", [])
+        reply = chat_with_groq(messages)
+        return JSONResponse({"reply": reply})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)

@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OralCIR-Net — AI Dental Detection & Assistant</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --deep:     #050d1a;
+    --navy:     #0a1a32;
+    --mid:      #0d3260;
+    --ocean:    #1153a0;
+    --sky:      #2a7fd4;
+    --azure:    #4aa3f5;
+    --mist:     #a8d4f8;
+    --white:    #e8f4ff;
+    --accent:   #38d9c0;
+    --accent2:  #ff6b6b;
+    --accent3:  #ffd166;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--white);
+    overflow-x: hidden;
+  }
+
+  /* ── GRADIENT BACKGROUND ── */
+  body {
+    background:
+      radial-gradient(ellipse 120% 80% at 10% 0%,   #0a1e40 0%, transparent 60%),
+      radial-gradient(ellipse 80%  60% at 90% 100%,  #1a5fa8 0%, transparent 55%),
+      radial-gradient(ellipse 60%  50% at 50% 50%,   #0d3260 0%, transparent 70%),
+      linear-gradient(165deg,
+        #040c18  0%,
+        #071428  12%,
+        #0b2248  26%,
+        #0e3568  40%,
+        #175ea8  57%,
+        #2e80d0  72%,
+        #5aaae8  86%,
+        #a0d0f5  100%
+      );
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  /* subtle animated noise overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+    opacity: 0.18;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── FLOATING LIGHT BLOBS ── */
+  .blob {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 0;
+    animation: drift 14s ease-in-out infinite alternate;
+  }
+  .blob-1 { width: 500px; height: 500px; background: rgba(21,100,200,.25); top: -120px; left: -100px; }
+  .blob-2 { width: 400px; height: 400px; background: rgba(80,180,255,.18); bottom: -80px; right: -80px; animation-delay: -5s; }
+  .blob-3 { width: 260px; height: 260px; background: rgba(56,217,192,.12); top: 50%; left: 55%; animation-delay: -9s; }
+
+  @keyframes drift {
+    from { transform: translate(0,0) scale(1); }
+    to   { transform: translate(30px,40px) scale(1.08); }
+  }
+
+  /* ── LAYOUT ── */
+  .page {
+    position: relative; z-index: 1;
+    min-height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+  }
+
+  /* ── NAV ── */
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 28px 64px;
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid rgba(255,255,255,.06);
+  }
+  .nav-brand {
+    font-family: 'Sora', sans-serif;
+    font-size: 1.25rem; font-weight: 700;
+    letter-spacing: -.5px;
+    color: var(--white);
+  }
+  .nav-brand span { color: var(--azure); }
+  .nav-links { display: flex; gap: 36px; }
+  .nav-links a {
+    font-size: .88rem; font-weight: 400; letter-spacing: .3px;
+    color: rgba(200,230,255,.7);
+    text-decoration: none;
+    transition: color .25s;
+  }
+  .nav-links a:hover { color: var(--white); }
+  .nav-cta {
+    padding: 9px 22px;
+    border-radius: 50px;
+    border: 1px solid rgba(160,210,255,.35);
+    background: rgba(255,255,255,.07);
+    backdrop-filter: blur(8px);
+    color: var(--white) !important;
+    transition: background .25s, border-color .25s !important;
+  }
+  .nav-cta:hover { background: rgba(255,255,255,.14) !important; border-color: rgba(160,210,255,.6) !important; }
+
+  /* ── HERO ── */
+  .hero {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 60px;
+    padding: 60px 64px 80px;
+    max-width: 1280px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  /* ── LEFT — visual orb ── */
+  .visual-side { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+
+  .orb-wrap {
+    position: relative;
+    width: 380px; height: 380px;
+  }
+
+  /* layered rings */
+  .ring {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.08);
+    animation: spin linear infinite;
+  }
+  .ring-1 { inset: 30px; border-color: rgba(74,163,245,.25); animation-duration: 22s; }
+  .ring-2 { inset: 55px; border-color: rgba(56,217,192,.2);  animation-duration: 35s; animation-direction: reverse; }
+  .ring-3 { inset: 10px; border-color: rgba(160,208,245,.1); animation-duration: 60s; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* glow disk */
+  .orb-disk {
+    position: absolute; inset: 60px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at 40% 35%,
+      rgba(90,170,232,.55) 0%,
+      rgba(17,83,160,.8)   45%,
+      rgba(5,13,26,.95)    100%
+    );
+    box-shadow:
+      0 0 60px rgba(74,163,245,.4),
+      0 0 120px rgba(56,217,192,.15),
+      inset 0 0 40px rgba(5,13,26,.6);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+
+  /* tooth SVG */
+  .tooth-svg { width: 130px; height: 130px; filter: drop-shadow(0 0 18px rgba(90,170,232,.7)); }
+
+  /* detection nodes */
+  .node {
+    position: absolute;
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'Sora', sans-serif;
+    font-size: .72rem; font-weight: 600;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    opacity: 0;
+    animation: fadeInNode .6s ease forwards;
+  }
+  .node-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .node-line {
+    height: 1px; background: currentColor; opacity: .5;
+    transform-origin: left;
+  }
+
+  .node-caries  { top: 22%; left: 6%;  color: var(--accent2); animation-delay: 1.2s; }
+  .node-infect  { top: 52%; left: 4%;  color: var(--accent);  animation-delay: 1.6s; }
+  .node-restore { top: 28%; right: 4%; color: var(--azure);   animation-delay: 2.0s; flex-direction: row-reverse; }
+
+  .node-caries  .node-line { width: 44px; }
+  .node-infect  .node-line { width: 52px; }
+  .node-restore .node-line { width: 40px; }
+
+  @keyframes fadeInNode {
+    from { opacity: 0; transform: translateX(-8px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  /* orbit dots */
+  .orbit-dot {
+    position: absolute;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--azure);
+    box-shadow: 0 0 8px var(--azure);
+    animation: orbitPath 8s linear infinite;
+  }
+  .orbit-dot:nth-child(2) { animation-delay: -4s; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+  @keyframes orbitPath {
+    from { transform: rotate(0deg) translateX(170px) rotate(0deg); }
+    to   { transform: rotate(360deg) translateX(170px) rotate(-360deg); }
+  }
+
+  /* badge */
+  .ai-badge {
+    position: absolute; bottom: 68px; left: 50%; transform: translateX(-50%);
+    padding: 5px 20px;
+    background: linear-gradient(90deg, rgba(56,217,192,.25), rgba(74,163,245,.2));
+    border: 1px solid rgba(56,217,192,.4);
+    border-radius: 50px;
+    font-family: 'Sora', sans-serif;
+    font-size: .7rem; font-weight: 700; letter-spacing: 2px;
+    color: var(--accent);
+    backdrop-filter: blur(8px);
+    white-space: nowrap;
+  }
+
+  .brand-label {
+    font-family: 'Sora', sans-serif;
+    font-size: 1.35rem; font-weight: 700;
+    letter-spacing: -.3px;
+    text-align: center;
+    color: var(--white);
+  }
+  .brand-label span { color: var(--azure); }
+  .sub-label {
+    font-size: .8rem; font-weight: 300; letter-spacing: 1.5px;
+    color: rgba(168,212,248,.55);
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  /* ── RIGHT — copy ── */
+  .copy-side { display: flex; flex-direction: column; gap: 30px; }
+
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 6px 16px 6px 8px;
+    background: rgba(56,217,192,.1);
+    border: 1px solid rgba(56,217,192,.25);
+    border-radius: 50px;
+    width: fit-content;
+  }
+  .eyebrow-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s ease infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.7)} }
+  .eyebrow span { font-size: .75rem; font-weight: 500; letter-spacing: 1px; color: var(--accent); text-transform: uppercase; }
+
+  h1 {
+    font-family: 'Sora', sans-serif;
+    font-size: clamp(2.6rem, 4vw, 3.6rem);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -1.5px;
+    color: var(--white);
+  }
+  h1 em { font-style: normal; color: var(--azure); }
+
+  .desc {
+    font-size: 1.06rem;
+    line-height: 1.75;
+    color: rgba(190,220,250,.75);
+    max-width: 480px;
+  }
+  .desc strong { color: var(--white); font-weight: 600; }
+
+  /* feature chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip {
+    display: flex; align-items: center; gap: 7px;
+    padding: 8px 16px;
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 50px;
+    font-size: .82rem; color: rgba(200,228,255,.8);
+    backdrop-filter: blur(6px);
+    transition: background .2s, border-color .2s;
+  }
+  .chip:hover { background: rgba(74,163,245,.15); border-color: rgba(74,163,245,.35); }
+  .chip-icon { font-size: .95rem; }
+
+  /* CTA */
+  .cta-row { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 16px 36px;
+    background: linear-gradient(135deg, #1a5fa8 0%, #2a7fd4 50%, #4aa3f5 100%);
+    border: none; border-radius: 50px;
+    font-family: 'Sora', sans-serif;
+    font-size: 1rem; font-weight: 600; letter-spacing: .2px;
+    color: var(--white);
+    cursor: pointer;
+    box-shadow: 0 8px 32px rgba(42,127,212,.45), 0 2px 8px rgba(0,0,0,.3);
+    transition: transform .2s, box-shadow .2s;
+    text-decoration: none;
+    position: relative; overflow: hidden;
+  }
+  .btn-primary::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.15) 50%, transparent 100%);
+    transform: translateX(-100%);
+    transition: transform .5s;
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 40px rgba(42,127,212,.55); }
+  .btn-primary:hover::after { transform: translateX(100%); }
+
+  .arrow { font-size: 1.1rem; transition: transform .2s; }
+  .btn-primary:hover .arrow { transform: translateX(4px); }
+
+  .btn-ghost {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 15px 28px;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,.2);
+    border-radius: 50px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .95rem; font-weight: 400;
+    color: rgba(200,228,255,.8);
+    cursor: pointer; text-decoration: none;
+    transition: background .2s, border-color .2s, color .2s;
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.35); color: var(--white); }
+
+  /* stats row */
+  .stats { display: flex; gap: 40px; padding-top: 8px; }
+  .stat-item { display: flex; flex-direction: column; gap: 4px; }
+  .stat-num {
+    font-family: 'Sora', sans-serif;
+    font-size: 1.6rem; font-weight: 800;
+    color: var(--white);
+    letter-spacing: -1px;
+  }
+  .stat-num span { color: var(--accent); }
+  .stat-label { font-size: .78rem; color: rgba(168,212,248,.5); letter-spacing: .5px; text-transform: uppercase; }
+  .stat-divider { width: 1px; background: rgba(255,255,255,.1); align-self: stretch; }
+
+  /* ── FOOTER BAR ── */
+  footer {
+    padding: 20px 64px;
+    border-top: 1px solid rgba(255,255,255,.06);
+    display: flex; align-items: center; justify-content: space-between;
+    backdrop-filter: blur(6px);
+  }
+  footer p { font-size: .78rem; color: rgba(0,0,0,0.75); }
+  .footer-links { display: flex; gap: 24px; }
+  .footer-links a { font-size: .78rem; color: rgba(168,212,248,.4); text-decoration: none; transition: color .2s; }
+  .footer-links a:hover { color: rgba(168,212,248,.8); }
+
+  /* ── ANIMATIONS (page load) ── */
+  .fade-up { opacity: 0; transform: translateY(24px); animation: fadeUp .7s ease forwards; }
+  .fade-up:nth-child(1) { animation-delay: .1s; }
+  .fade-up:nth-child(2) { animation-delay: .25s; }
+  .fade-up:nth-child(3) { animation-delay: .4s; }
+  .fade-up:nth-child(4) { animation-delay: .55s; }
+  .fade-up:nth-child(5) { animation-delay: .7s; }
+  .fade-up:nth-child(6) { animation-delay: .85s; }
+
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .slide-in { opacity: 0; transform: translateX(-30px); animation: slideIn .8s ease .3s forwards; }
+  @keyframes slideIn { to { opacity: 1; transform: translateX(0); } }
+
+  /* pulse ring on orb */
+  .pulse-ring {
+    position: absolute; inset: 50px;
+    border-radius: 50%;
+    border: 1px solid rgba(74,163,245,.3);
+    animation: pulseRing 3s ease-out infinite;
+  }
+  @keyframes pulseRing {
+    0%   { transform: scale(1); opacity: .6; }
+    100% { transform: scale(1.25); opacity: 0; }
+  }
+
+  @media (max-width: 900px) {
+    nav { padding: 20px 28px; }
+    .nav-links { display: none; }
+    .hero { grid-template-columns: 1fr; padding: 40px 28px; text-align: center; }
+    .visual-side { order: -1; }
+    .orb-wrap { width: 280px; height: 280px; }
+    .orb-disk { inset: 45px; }
+    .eyebrow, .chips, .cta-row, .stats { justify-content: center; }
+    .desc { margin: 0 auto; }
+    footer { flex-direction: column; gap: 12px; text-align: center; padding: 20px 28px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div class="blob blob-3"></div>
+
+<!-- Floating Particles Canvas -->
+<canvas id="particles" style="position:fixed;inset:0;z-index:0;pointer-events:none;"></canvas>
+
+<script>
+(function(){
+  const canvas = document.getElementById('particles');
+  const ctx = canvas.getContext('2d');
+
+  function resize(){
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // Particle config
+  const COUNT = 72;
+  const particles = [];
+
+  for(let i = 0; i < COUNT; i++){
+    particles.push({
+      x:    Math.random() * window.innerWidth,
+      y:    Math.random() * window.innerHeight,
+      r:    Math.random() * 2.2 + 0.4,          // radius 0.4–2.6px
+      speedX: (Math.random() - 0.5) * 0.35,
+      speedY: -(Math.random() * 0.5 + 0.15),    // mostly float upward
+      opacity: Math.random() * 0.55 + 0.15,
+      opacityDir: (Math.random() > 0.5 ? 1 : -1) * 0.003,
+      // colour: mostly white-blue, few teal accents
+      hue: Math.random() > 0.85 ? '56,217,192' : (Math.random() > 0.5 ? '168,212,248' : '74,163,245'),
+    });
+  }
+
+  function draw(){
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    particles.forEach(p => {
+      // drift
+      p.x += p.speedX;
+      p.y += p.speedY;
+
+      // fade in/out gently
+      p.opacity += p.opacityDir;
+      if(p.opacity > 0.7 || p.opacity < 0.08) p.opacityDir *= -1;
+
+      // wrap around
+      if(p.y < -10)                 p.y = canvas.height + 10;
+      if(p.x < -10)                 p.x = canvas.width  + 10;
+      if(p.x > canvas.width  + 10) p.x = -10;
+
+      // draw glowing dot
+      const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 3.5);
+      grd.addColorStop(0,   `rgba(${p.hue},${p.opacity})`);
+      grd.addColorStop(0.4, `rgba(${p.hue},${p.opacity * 0.5})`);
+      grd.addColorStop(1,   `rgba(${p.hue},0)`);
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = grd;
+      ctx.fill();
+
+      // solid core
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${p.hue},${Math.min(p.opacity * 1.6, 0.9)})`;
+      ctx.fill();
+    });
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+</script>
+
+<div class="page">
+
+  <!-- NAV -->
+  <nav>
+    <div class="nav-brand">Oral<span>CIR</span>-Net</div>
+    <div class="nav-links">
+      <a href="tel:+923002764270" class="nav-cta">📞 Contact</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <main class="hero">
+
+    <!-- LEFT: Visual -->
+    <div class="visual-side slide-in">
+      <div class="orb-wrap">
+
+        <!-- rings -->
+        <div class="ring ring-3"></div>
+        <div class="ring ring-1"></div>
+        <div class="ring ring-2"></div>
+
+        <!-- pulse -->
+        <div class="pulse-ring"></div>
+        <div class="pulse-ring" style="animation-delay:1.5s;inset:70px;"></div>
+
+        <!-- orbit dots -->
+        <div class="orbit-dot"></div>
+        <div class="orbit-dot"></div>
+
+        <!-- central disk with tooth -->
+        <div class="orb-disk">
+          <svg class="tooth-svg" viewBox="0 0 100 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- main tooth body -->
+            <path d="M50 10 C28 10 18 26 18 40 C18 54 22 62 26 70 C29 77 30 88 32 98 C33 104 36 108 40 107 C44 106 46 98 50 92 C54 98 56 106 60 107 C64 108 67 104 68 98 C70 88 71 77 74 70 C78 62 82 54 82 40 C82 26 72 10 50 10Z"
+                  fill="url(#toothGrad)" stroke="rgba(160,210,255,0.3)" stroke-width="1"/>
+            <!-- grid lines -->
+            <line x1="35" y1="38" x2="65" y2="38" stroke="rgba(74,163,245,0.5)" stroke-width="0.8"/>
+            <line x1="35" y1="50" x2="65" y2="50" stroke="rgba(74,163,245,0.5)" stroke-width="0.8"/>
+            <line x1="35" y1="62" x2="65" y2="62" stroke="rgba(74,163,245,0.5)" stroke-width="0.8"/>
+            <line x1="38" y1="32" x2="38" y2="68" stroke="rgba(74,163,245,0.5)" stroke-width="0.8"/>
+            <line x1="50" y1="28" x2="50" y2="70" stroke="rgba(74,163,245,0.5)" stroke-width="0.8"/>
+            <line x1="62" y1="32" x2="62" y2="68" stroke="rgba(74,163,245,0.5)" stroke-width="0.8"/>
+            <!-- node points -->
+            <circle cx="38" cy="38" r="2.5" fill="rgba(74,163,245,0.9)"/>
+            <circle cx="50" cy="38" r="2.5" fill="rgba(74,163,245,0.9)"/>
+            <circle cx="62" cy="38" r="2.5" fill="rgba(74,163,245,0.9)"/>
+            <circle cx="38" cy="50" r="2.5" fill="rgba(74,163,245,0.9)"/>
+            <circle cx="50" cy="50" r="3"   fill="rgba(56,217,192,1)"/>
+            <circle cx="62" cy="50" r="2.5" fill="rgba(74,163,245,0.9)"/>
+            <circle cx="38" cy="62" r="2.5" fill="rgba(74,163,245,0.9)"/>
+            <circle cx="50" cy="62" r="2.5" fill="rgba(74,163,245,0.9)"/>
+            <circle cx="62" cy="62" r="2.5" fill="rgba(74,163,245,0.9)"/>
+            <!-- caries highlight -->
+            <circle cx="32" cy="34" r="5" fill="rgba(255,107,107,0.35)" stroke="rgba(255,107,107,0.7)" stroke-width="1.2"/>
+            <defs>
+              <linearGradient id="toothGrad" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+                <stop offset="0%"   stop-color="#6ec0f5"/>
+                <stop offset="50%"  stop-color="#3a8fd4"/>
+                <stop offset="100%" stop-color="#1a5080"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+
+        <!-- detection labels -->
+        <div class="node node-caries">
+          <div class="node-dot" style="background:var(--accent2);box-shadow:0 0 6px var(--accent2)"></div>
+          <div class="node-line" style="color:var(--accent2)"></div>
+          Caries
+        </div>
+        <div class="node node-infect">
+          <div class="node-dot" style="background:var(--accent);box-shadow:0 0 6px var(--accent)"></div>
+          <div class="node-line" style="color:var(--accent)"></div>
+          Infection
+        </div>
+        <div class="node node-restore" style="flex-direction:row-reverse">
+          Restoration
+          <div class="node-line" style="color:var(--azure)"></div>
+          <div class="node-dot" style="background:var(--azure);box-shadow:0 0 6px var(--azure)"></div>
+        </div>
+
+        <div class="ai-badge">A · I</div>
+      </div>
+
+      <div class="brand-label">Oral<span>CIR</span>-Net</div>
+      <div class="sub-label">AI Dental Detection &amp; Assistant</div>
+    </div>
+
+    <!-- RIGHT: Copy -->
+    <div class="copy-side">
+      <h1 class="fade-up">
+        Your Oral Health,<br><em>Intelligently</em><br>Understood
+      </h1>
+
+      <p class="desc fade-up">
+        An AI-powered dental assistant designed to help you understand your oral health.
+        Describe symptoms in <strong>Urdu or English</strong>, upload your X-ray, and get instant
+        guidance from your dentist <strong>Dr. Aliza Bhatti</strong> — because your dental health is our priority.
+      </p>
+
+      <div class="chips fade-up">
+        <div class="chip"><span class="chip-icon">🦷</span> Caries Detection</div>
+        <div class="chip"><span class="chip-icon">🔬</span> Infection Analysis</div>
+        <div class="chip"><span class="chip-icon">🩻</span> X-Ray Upload</div>
+        <div class="chip"><span class="chip-icon">🌐</span> Urdu & English</div>
+        <div class="chip"><span class="chip-icon">⚡</span> Instant Results</div>
+      </div>
+
+      <div class="cta-row fade-up">
+        <a href="index.html" class="btn-primary">
+          Let's Get Started
+          <span class="arrow">→</span>
+        </a>
+
+      </div>
+
+      <div class="stats fade-up">
+        <div class="stat-item">
+          <div class="stat-num">98<span>%</span></div>
+          <div class="stat-label">Accuracy</div>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <div class="stat-num">3<span>s</span></div>
+          <div class="stat-label">Detection Time</div>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <div class="stat-num">5<span>k+</span></div>
+          <div class="stat-label">Patients Helped</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer>
+    <p>© 2026 OralCIR-Net . AI Dental Detection and Assistant</p>
+    <div class="footer-links">
+      <a href="#">Privacy</a>
+      <a href="#">Terms</a>
+      <a href="#">Contact</a>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

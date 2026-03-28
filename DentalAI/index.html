@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OralCIR-Net: AI Dental Detection & Assistant</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav>
+    <img src="logo.svg" height="45" alt="OralCIR-Net Logo"/>
+    <div class="nav-links">
+      <a href="#features">Services</a>
+      <a href="#how">How it works</a>
+      <a href="#booking">Appointment</a>
+      
+    </div>
+    <button class="nav-btn" onclick="document.getElementById('booking').scrollIntoView({behavior:'smooth'})">Book Appointment</button>
+  </nav>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-text">
+      <h1>OralCIR-Net <span>: AI Dental Detection & Assistant</span></h1>
+      <p>Describe your symptoms in Urdu or English — our AI assistant will analyze them and guide you to the right dental care.</p>
+      <div class="hero-btns">
+        <button class="btn-primary" onclick="document.getElementById('chatInput').focus()">💬 Chat with AI</button>
+        <button class="btn-outline" onclick="document.getElementById('booking').scrollIntoView({behavior:'smooth'})">📅 Book Appointment</button>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-num">3</div>
+          <div class="stat-label">Conditions detected</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">735+</div>
+          <div class="stat-label">X-rays trained</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">2</div>
+          <div class="stat-label">Languages</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHATBOT -->
+    <div class="chatbot-card">
+      <div class="chat-header">
+        <div class="chat-avatar">🦷</div>
+        <div>
+          <div class="chat-title">Dental AI Assistant</div>
+          <div class="chat-subtitle">Urdu / English — Voice supported</div>
+        </div>
+        <div class="online-dot"></div>
+      </div>
+      <div class="chat-messages" id="chatMessages">
+        <div class="msg msg-bot">
+          Assalam o Alaikum! Main aapka dental assistant hun. Apni takleef batayein — Urdu ya English mein. 🦷
+          <div class="msg-time">Just now</div>
+        </div>
+      </div>
+
+      <!-- X-RAY UPLOAD -->
+      <div style="padding:8px 14px;border-bottom:2px solid #BBDEFB;background:white;">
+        <label style="font-size:12px;color:#546E7A;display:block;margin-bottom:4px;">📤 X-Ray Upload karein</label>
+        <input type="file" accept="image/*" onchange="uploadXray(this.files[0])"
+          style="font-size:12px;width:100%;cursor:pointer;" />
+      </div>
+
+      <div class="chat-input-area">
+        <div class="lang-toggle">
+          <button class="lang-btn active" id="btnUR" onclick="setLang('ur')">اردو</button>
+          <button class="lang-btn" id="btnEN" onclick="setLang('en')">English</button>
+        </div>
+        <div class="input-row">
+          <input class="chat-input" id="chatInput" placeholder="Apni takleef likhein..." onkeydown="handleKey(event)" />
+          <button class="mic-btn" id="micBtn" onclick="toggleMic()" title="Voice input">🎙️</button>
+          <button class="send-btn" onclick="sendMessage()">➤</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <div class="features" id="features">
+    <div class="section-title">What We Detect</div>
+    <div class="section-sub">AI-powered X-ray analysis for 4 dental conditions</div>
+    <div class="features-grid">
+      <div class="feature-card red">
+        <div class="feature-icon icon-red">🔴</div>
+        <div class="feature-title">Caries (Cavity)</div>
+        <div class="feature-desc">AI-powered X-ray analysis detects early signs of tooth decay before they become serious.And can usually efficiently detect interproximal caries too.</div>
+      </div>
+      <div class="feature-card green">
+        <div class="feature-icon icon-green">🟡</div>
+        <div class="feature-title">Infection</div>
+        <div class="feature-desc">"Identifies periapical lesions and signs of dental infection requiring immediate attention."</div>
+      </div>
+      <div class="feature-card blue">
+        <div class="feature-icon icon-blue">🔵</div>
+        <div class="feature-title">Restoration</div>
+        <div class="feature-desc">"Detects existing fillings, crowns, and previous restorative dental work accurately."</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="how" id="how">
+    <div class="section-title">How It Works</div>
+    <div class="section-sub">4 simple steps to better dental care</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-title">Symptoms </div>
+        <div class="step-desc">Describe your symptoms to the chatbot in Urdu or English.</div>
+        <div class="step-desc">Urdu ya English mein apni takleef chatbot ko batayein</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-title">AI analysis</div>
+        <div class="step-desc">AI analyzes your symptoms and identifies the possible dental condition</div>
+        <div class="step-desc">AI symptoms analyze karke possible condition batata hai</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-title">X-ray upload</div>
+        <div class="step-desc">Optional: Upload your X-ray for a detailed AI-powered diagnosis</div>
+        <div class="step-desc">Optional: X-ray upload karein detailed AI diagnosis ke liye</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-title">consult doctor online</div>
+        <div class="step-desc">Book an online appointment and consult with a dental professional</div>
+        <div class="step-desc">Online appointment book karein aur doctor se consult karein</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOOKING -->
+  <div class="booking-section" id="booking">
+    <h2>Book an Appointment</h2>
+    <p>"Your AI diagnosis is ready. Take the next step — consult with Dr. Aliza Bhatti.".</p>
+    <button class="booking-btn" onclick="openCalendly()">📅 Schedule Appointment</button>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    &copy; 2026 OralCIR-Net — Bilingual Smart Dental Care | Developed with ❤️
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

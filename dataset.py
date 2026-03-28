@@ -1,55 +1,95 @@
+"""
+dataset.py — Custom PyTorch Dataset for Dental AI U-Net
+Loads X-ray images + corresponding PNG masks
+No augmentation — dataset already augmented by Roboflow
+"""
+
 import os
 import numpy as np
 from PIL import Image
-import torch
 from torch.utils.data import Dataset
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
+import torchvision.transforms.functional as TF
+import torch
+
 
 class DentalDataset(Dataset):
-    def __init__(self, img_dir, mask_dir, transform=None):
-        self.img_dir = img_dir
-        self.mask_dir = mask_dir
-        self.transform = transform
-        self.images = sorted([f for f in os.listdir(img_dir) 
-                              if f.endswith(('.jpg', '.jpeg', '.png'))])
-        self.masks = sorted(os.listdir(mask_dir))
+    def __init__(self, image_dir, mask_dir):
+        """
+        Args:
+            image_dir : path to folder containing X-ray images
+            mask_dir  : path to folder containing PNG masks
+        """
+        self.image_dir = image_dir
+        self.mask_dir  = mask_dir
+
+        # Get all image files
+        self.images = sorted([
+            f for f in os.listdir(image_dir)
+            if f.lower().endswith((".jpg", ".jpeg", ".png"))
+        ])
+
+        # Match masks to images
+        self.pairs = []
+        for img_file in self.images:
+            base      = os.path.splitext(img_file)[0]
+            mask_file = f"{base}_mask.png"
+            mask_path = os.path.join(mask_dir, mask_file)
+            if os.path.exists(mask_path):
+                self.pairs.append((img_file, mask_file))
+            else:
+                print(f"  [WARN] No mask found for: {img_file} — skipping")
+
+        print(f"  Dataset loaded: {len(self.pairs)} image-mask pairs from {image_dir}")
 
     def __len__(self):
-        return len(self.images)
+        return len(self.pairs)
 
     def __getitem__(self, idx):
-        img_path = os.path.join(self.img_dir, self.images[idx])
-        img = np.array(Image.open(img_path).convert("RGB"))
+        img_file, mask_file = self.pairs[idx]
 
-        mask_path = os.path.join(self.mask_dir, self.masks[idx])
-        mask = np.array(Image.open(mask_path))
+        # Load image as grayscale (X-rays are grayscale)
+        image = Image.open(os.path.join(self.image_dir, img_file)).convert("L")
 
-        if self.transform:
-            augmented = self.transform(image=img, mask=mask)
-            img = augmented['image']
-            mask = augmented['mask']
+        # Load mask (keep as-is — pixel values 0,1,2,3)
+        mask  = Image.open(os.path.join(self.mask_dir, mask_file))
 
-        return img, mask.long()
+        # Resize both to 512x512
+        image = image.resize((512, 512), Image.BILINEAR)
+        mask  = mask.resize((512, 512),  Image.NEAREST)   # NEAREST preserves class values
+
+        # Convert to tensors
+        image = TF.to_tensor(image)                        # shape: (1, 512, 512), range [0,1]
+        mask  = torch.from_numpy(np.array(mask)).long()    # shape: (512, 512), values 0-3
+
+        return image, mask
 
 
-def get_transforms(train=True):
-    if train:
-        return A.Compose([
-            A.Resize(256, 256),
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),           # ← new
-            A.RandomRotate90(p=0.5),          # ← new
-            A.RandomBrightnessContrast(p=0.3),
-            A.ElasticTransform(p=0.2),        # ← new
-            A.Normalize(mean=(0.485, 0.456, 0.406),
-                       std=(0.229, 0.224, 0.225)),
-            ToTensorV2()
-        ])
-    else:
-        return A.Compose([
-            A.Resize(256, 256),
-            A.Normalize(mean=(0.485, 0.456, 0.406),
-                       std=(0.229, 0.224, 0.225)),
-            ToTensorV2()
-        ])
+# ─────────────────────────────────────────────
+#  QUICK TEST — run this file directly to verify
+# ─────────────────────────────────────────────
+if __name__ == "__main__":
+    import os
+
+    try:
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    except NameError:
+        BASE_DIR = os.path.abspath(os.getcwd())
+
+    DATA_ROOT = os.path.join(BASE_DIR, "DentAI.v2i.coco-segmentation")
+    MASK_ROOT = os.path.join(BASE_DIR, "masks")
+
+    print("Testing DentalDataset...\n")
+
+    dataset = DentalDataset(
+        image_dir = os.path.join(DATA_ROOT, "train"),
+        mask_dir  = os.path.join(MASK_ROOT, "train"),
+    )
+
+    img, mask = dataset[0]
+
+    print(f"\n  Total pairs    : {len(dataset)}")
+    print(f"  Image shape    : {img.shape}")       # should be (1, 512, 512)
+    print(f"  Image range    : [{img.min():.2f}, {img.max():.2f}]")
+    print(f"  Mask shape     : {mask.shape}")      # should be (512, 512)
+    print(f"  Mask unique    : {mask.unique()}")   # should contain values from [0,1,2,3]
+    print(f"\n  Dataset looks correct!")
